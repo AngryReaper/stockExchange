@@ -1,5 +1,5 @@
 import java.io.*;
-import java.util.LinkedList;
+import java.util.*;
 
 
 public class Main {
@@ -8,64 +8,85 @@ public class Main {
     public static final String CLIENTS = "clients.txt";
     public static final String ORDERS = "orders.txt";
     public static final String RESULTS = "results.txt";
+    public static HashMap<String, ArrayList<Order>> mapOfOrders;
 
     public static void main(String[] args) {
-
+        long start = System.currentTimeMillis();
+        mapOfOrders = fillingStorage();
         String[] data;
         try {
             BufferedReader cReader = new BufferedReader(new FileReader(DATA_DIR+CLIENTS));
             for (String curLine; (curLine = cReader.readLine()) != null;) {
                 data = curLine.split("\t");
                 Client client = new Client(data);
-                trade(client.getName(),client.getClientData());
+                trade(client.getName(),client.getClientData(), mapOfOrders.get(client.getName()));
             }
         } catch (Exception e) {
             System.err.println("Ошибка обработки данных из файла "+CLIENTS);
             e.printStackTrace();
         }
-
+        long finish = System.currentTimeMillis() - start;
+        System.out.println(finish);
     }
 
-    public static void trade(String clientName, LinkedList<Integer> clientData) {
+    public static HashMap<String, ArrayList<Order>> fillingStorage() {
+
+        HashMap<String, ArrayList<Order>> hsmap = new HashMap<>();
+
         String[] orderData;
-        LinkedList<Integer> results;
-        String resultLine;
-        BufferedWriter rWriter = null;
-        FileWriter fWriter = null;
         try {
             BufferedReader dReader = new BufferedReader(new FileReader(DATA_DIR+ORDERS));
             for (String orderLine; (orderLine = dReader.readLine()) != null;) {
                 orderData = orderLine.split("\t");
                 Order order = new Order(orderData);
-                if (clientName.equals(order.getName())) {
-                    if (order.getOperation().equals("b")) {
-                        results = buy(clientData,order.getStockName(),order.getPrice(),order.getAmount());
-                    } else {
-                        results = sell(clientData,order.getStockName(),order.getPrice(),order.getAmount());
-                    }
-                    rWriter = new BufferedWriter(fWriter = new FileWriter(DATA_DIR+RESULTS, true));
-                    resultLine = clientName;
-                    for (int i = 0; i < results.size(); i++) {
-                        if (i == results.size() - 1) {
-                            resultLine += "\t" + results.get(i) + "\n";
-                        } else {
-                            resultLine += "\t" + results.get(i);
-                        }
 
-                    }
-
-                    rWriter.write(resultLine);
-                } else {}
+                if (!hsmap.containsKey(order.getName())){
+                    ArrayList<Order> arList = new ArrayList<>();
+                    arList.add(order);
+                    hsmap.put(order.getName(), arList);
+                } else {
+                    hsmap.get(order.getName()).add(order);
+                }
             }
+            dReader.close();
+
+        } catch (IOException e) {
+            System.err.println("Ошибка обработки данных из файла "+ORDERS);
+        }
+        return hsmap;
+    }
+
+    public static void trade(String clientName, LinkedList<Integer> clientData, ArrayList<Order> orders) {
+        LinkedList<Integer> results;
+        StringBuilder resultLine = new StringBuilder();
+        BufferedWriter rWriter = null;
+        try {
+            for (int i = 0; i < orders.size(); i++) {
+                Order order = orders.get(i);
+                if (order.getOperation().equals("b")) {
+                    results = buy(clientData,order.getStockName(),order.getPrice(),order.getAmount());
+                } else {
+                    results = sell(clientData,order.getStockName(),order.getPrice(),order.getAmount());
+                }
+                rWriter = new BufferedWriter(new FileWriter(DATA_DIR+RESULTS, true));
+                resultLine.append(clientName);
+                for (int j = 0; j < results.size(); j++) {
+                    if (j == results.size() - 1) {
+                        resultLine .append("\t" + results.get(j) + "\n");
+                    } else {
+                        resultLine.append("\t" + results.get(j));
+                    }
+                }
+                rWriter.write(resultLine.toString());
+                resultLine.setLength(0);
+            }
+
         } catch (IOException e) {
             System.err.println("Ошибка обработки данных из файла "+ORDERS);
         } finally {
             try {
                 if (rWriter != null)
                     rWriter.close();
-
-                if (fWriter != null)
-                    fWriter.close();
 
             } catch (IOException e) {
                 e.printStackTrace();
